@@ -10,6 +10,7 @@ using System.Windows.Forms;
 
 namespace SocketFileTransfer
 {
+    #region CustomButton
     // Кастомный класс кнопки 
     public class CustomButton : Button
     {
@@ -18,7 +19,6 @@ namespace SocketFileTransfer
 
         public CustomButton()
         {
-            // Отключаем системную отрисовку текста для неактивных кнопок
             SetStyle(ControlStyles.UserPaint, true);
             UpdateForeColor();
         }
@@ -29,8 +29,7 @@ namespace SocketFileTransfer
             set
             {
                 _normalColor = value;
-                if (Enabled)
-                    base.ForeColor = value;
+                if (Enabled) base.ForeColor = value;
             }
         }
 
@@ -40,12 +39,10 @@ namespace SocketFileTransfer
             set
             {
                 _disabledColor = value;
-                if (!Enabled)
-                    base.ForeColor = value;
+                if (!Enabled) base.ForeColor = value;
             }
         }
 
-        // Событие при изменении состояния активности кнопки
         protected override void OnEnabledChanged(EventArgs e)
         {
             base.OnEnabledChanged(e);
@@ -53,19 +50,14 @@ namespace SocketFileTransfer
             Invalidate();
         }
 
-        // переопределённая отрисовка кнопки
         protected override void OnPaint(PaintEventArgs pevent)
         {
-            // Сначала рисуем стандартную кнопку
             base.OnPaint(pevent);
-
-            // Потом перерисовываем текст с нужным цветом
             TextRenderer.DrawText(pevent.Graphics, Text, Font, ClientRectangle,
-            Enabled ? _normalColor : _disabledColor,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+                Enabled ? _normalColor : _disabledColor,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
         }
 
-        // Обновление цвета текста
         private void UpdateForeColor()
         {
             if (Enabled)
@@ -74,9 +66,11 @@ namespace SocketFileTransfer
                 base.ForeColor = _disabledColor;
         }
     }
+    #endregion
 
     public partial class Form1 : Form
     {
+        #region Fields
         // Сервер
         private TcpListener? serverListener;
         private Thread? serverThread;
@@ -89,61 +83,68 @@ namespace SocketFileTransfer
 
         // Для навигации по папкам
         private string currentPath = @"C:\";
+        #endregion
 
-        // Конструктор формы
+        #region Constructor and initialization
         public Form1()
         {
             InitializeComponent();
             LoadDrives();
             LoadFilesAndFolders(currentPath);
         }
+        #endregion
 
-        // Загрузка списка логических дисков
+        #region File system navigation
         private void LoadDrives()
         {
             comboBoxDrives.Items.Clear();
-            var drives = DriveInfo.GetDrives();
-            foreach (var drive in drives)
-            {
+            foreach (var drive in DriveInfo.GetDrives())
                 comboBoxDrives.Items.Add(drive.Name);
-            }
             if (comboBoxDrives.Items.Count > 0)
                 comboBoxDrives.SelectedIndex = 0;
         }
 
-        // Загрузка файлов и папок из указанного пути
         private void LoadFilesAndFolders(string path)
         {
+            listBoxFiles.Items.Clear();
+
             try
             {
-                listBoxFiles.Items.Clear();
                 DirectoryInfo dirInfo = new DirectoryInfo(path);
 
                 if (dirInfo.Parent != null)
-                {
                     listBoxFiles.Items.Add("..");
+
+                foreach (var dir in dirInfo.EnumerateDirectories())
+                {
+                    try { listBoxFiles.Items.Add(dir.Name); }
+                    catch { /* нет прав – пропускаем */ }
                 }
 
-                foreach (var dir in dirInfo.GetDirectories())
+                foreach (var file in dirInfo.EnumerateFiles())
                 {
-                    listBoxFiles.Items.Add(dir.Name);
-                }
-
-                foreach (var file in dirInfo.GetFiles())
-                {
-                    listBoxFiles.Items.Add(file.Name);
+                    try { listBoxFiles.Items.Add(file.Name); }
+                    catch { /* нет прав – пропускаем */ }
                 }
 
                 currentPath = path;
             }
             catch (Exception ex)
             {
+                // Сама корневая папка недоступна
                 listBoxFiles.Items.Clear();
-                listBoxFiles.Items.Add("Ошибка доступа: " + ex.Message);
+                string parent = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(parent))
+                    listBoxFiles.Items.Add("..");
+
+                MessageBox.Show($"Ошибка доступа: {ex.Message}", "Ошибка",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // currentPath не меняем, чтобы можно было вернуться
             }
         }
+        #endregion
 
-        // Обработчик изменения выбранного диска
+        #region Event handlers – form controls
         private void comboBoxDrives_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (comboBoxDrives.SelectedItem != null)
@@ -153,11 +154,9 @@ namespace SocketFileTransfer
             }
         }
 
-        // Обработчик двойного клика по элементу списка (вход в папку)
         private void listBoxFiles_DoubleClick(object sender, EventArgs e)
         {
             if (listBoxFiles.SelectedItem == null) return;
-
             string selected = listBoxFiles.SelectedItem.ToString();
 
             if (selected == "..")
@@ -165,18 +164,29 @@ namespace SocketFileTransfer
                 DirectoryInfo parent = Directory.GetParent(currentPath);
                 if (parent != null)
                     LoadFilesAndFolders(parent.FullName);
+                return;
             }
-            else
+
+            string newPath = Path.Combine(currentPath, selected);
+
+            // Если это папка – проверяем доступ перед загрузкой
+            if (Directory.Exists(newPath))
             {
-                string newPath = Path.Combine(currentPath, selected);
-                if (Directory.Exists(newPath))
+                try
                 {
+                    Directory.EnumerateFileSystemEntries(newPath).FirstOrDefault();
                     LoadFilesAndFolders(newPath);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Нет доступа к каталогу \"{selected}\": {ex.Message}",
+                                    "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
+        #endregion
 
-        // Добавление сообщения в лог клиента
+        #region Logging helpers
         private void AppendLogClient(string msg)
         {
             if (richTextBoxClient.InvokeRequired)
@@ -188,7 +198,6 @@ namespace SocketFileTransfer
             richTextBoxClient.ScrollToCaret();
         }
 
-        // Добавление сообщения в лог сервера
         private void AppendLogServer(string msg)
         {
             if (richTextBoxServer.InvokeRequired)
@@ -199,12 +208,12 @@ namespace SocketFileTransfer
             richTextBoxServer.AppendText(msg + Environment.NewLine);
             richTextBoxServer.ScrollToCaret();
         }
+        #endregion
 
-        // Запуск сервера
+        #region Server logic
         private void StartServer()
         {
             if (serverRunning) return;
-
             serverRunning = true;
             serverThread = new Thread(ServerThreadFunc);
             serverThread.IsBackground = true;
@@ -213,13 +222,6 @@ namespace SocketFileTransfer
             AppendLogServer($"Сервер включен {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
         }
 
-        // Обработчик кнопки остановки сервера
-        private void btnServerStop_Click(object sender, EventArgs e)
-        {
-            StopServer();
-        }
-
-        // Остановка сервера
         private void StopServer()
         {
             serverRunning = false;
@@ -228,7 +230,6 @@ namespace SocketFileTransfer
             AppendLogServer($"Сервер остановлен {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
         }
 
-        // Поток сервера (ожидание подключений и обработка запросов)
         private void ServerThreadFunc()
         {
             try
@@ -243,25 +244,8 @@ namespace SocketFileTransfer
                         TcpClient clientSocket = serverListener.AcceptTcpClient();
                         AppendLogServer($"Клиент соединился {DateTime.Now:dd.MM.yyyy HH:mm:ss} с адреса {((IPEndPoint)clientSocket.Client.RemoteEndPoint).Address}");
 
-                        using (NetworkStream stream = clientSocket.GetStream())
-                        {
-                            string drives = string.Join(",", DriveInfo.GetDrives().Select(d => d.Name.TrimEnd('\\')));
-                            byte[] drivesData = Encoding.UTF8.GetBytes(drives);
-                            stream.Write(drivesData, 0, drivesData.Length);
-                            stream.Flush();
-
-                            byte[] buffer = new byte[4096];
-                            int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                            string path = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
-
-                            AppendLogServer($"Сервер получил {DateTime.Now:dd.MM.yyyy HH:mm:ss}: {path}");
-
-                            string response = ProcessServerRequest(path);
-                            byte[] responseData = Encoding.UTF8.GetBytes(response);
-                            stream.Write(responseData, 0, responseData.Length);
-                            stream.Flush();
-                        }
-                        clientSocket.Close();
+                        // Обрабатываем подключение в отдельной задаче, чтобы не блокировать приём новых клиентов
+                        ThreadPool.QueueUserWorkItem(_ => HandleClient(clientSocket));
                     }
                     Thread.Sleep(100);
                 }
@@ -273,7 +257,43 @@ namespace SocketFileTransfer
             }
         }
 
-        // Обработка запроса от клиента (каталог или файл)
+        private void HandleClient(TcpClient clientSocket)
+        {
+            try
+            {
+                using (clientSocket)
+                using (NetworkStream stream = clientSocket.GetStream())
+                {
+                    // 1. Отправляем список дисков (только один раз в начале сессии)
+                    string drives = string.Join(",", DriveInfo.GetDrives().Select(d => d.Name.TrimEnd('\\')));
+                    byte[] drivesData = Encoding.UTF8.GetBytes(drives);
+                    stream.Write(drivesData, 0, drivesData.Length);
+                    stream.Flush();
+
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+
+                    // 2. Принимаем запросы, пока клиент не отключится
+                    while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        string path = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+                        AppendLogServer($"Сервер получил {DateTime.Now:dd.MM.yyyy HH:mm:ss}: {path}");
+
+                        string response = ProcessServerRequest(path);
+                        byte[] responseData = Encoding.UTF8.GetBytes(response);
+                        stream.Write(responseData, 0, responseData.Length);
+                        stream.Flush();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Игнорируем тихое отключение клиента, логируем только реальные ошибки
+                if (ex is IOException || ex is ObjectDisposedException) return;
+                AppendLogServer($"Ошибка при обработке клиента: {ex.Message}");
+            }
+        }
+
         private string ProcessServerRequest(string path)
         {
             try
@@ -283,10 +303,10 @@ namespace SocketFileTransfer
                     var dirs = Directory.GetDirectories(path);
                     var files = Directory.GetFiles(path);
                     StringBuilder sb = new StringBuilder();
-                    sb.AppendLine("КАТАЛОГИ");
+                    sb.AppendLine("-- КАТАЛОГИ --");
                     foreach (var d in dirs)
                         sb.AppendLine(Path.GetFileName(d));
-                    sb.AppendLine("ФАЙЛЫ");
+                    sb.AppendLine("-- ФАЙЛЫ --");
                     foreach (var f in files)
                         sb.AppendLine(Path.GetFileName(f));
                     return sb.ToString();
@@ -308,8 +328,9 @@ namespace SocketFileTransfer
                 return $"Ошибка: {ex.Message}";
             }
         }
+        #endregion
 
-        // Обработчик кнопки подключения к серверу
+        #region Client logic
         private async void btnConnect_Click(object sender, EventArgs e)
         {
             if (clientConnected)
@@ -318,10 +339,11 @@ namespace SocketFileTransfer
                 return;
             }
 
+            // Автозапуск своего сервера при необходимости
             if (!serverRunning)
             {
                 StartServer();
-                Thread.Sleep(500);
+                Thread.Sleep(500); // Даём серверу время запуститься
             }
 
             string serverIp = txtIpAddress.Text.Trim();
@@ -341,6 +363,7 @@ namespace SocketFileTransfer
                 btnConnect.Enabled = false;
                 btnDisconnect.Enabled = true;
 
+                // Получаем список дисков от сервера
                 byte[] buffer = new byte[4096];
                 int bytesRead = await clientStream.ReadAsync(buffer, 0, buffer.Length);
                 string drivesList = Encoding.UTF8.GetString(buffer, 0, bytesRead);
@@ -369,8 +392,12 @@ namespace SocketFileTransfer
             }
         }
 
-        // Обработчик кнопки отключения от сервера
         private void btnDisconnect_Click(object sender, EventArgs e)
+        {
+            DisconnectClient();
+        }
+
+        private void DisconnectClient()
         {
             if (clientConnected)
             {
@@ -383,7 +410,6 @@ namespace SocketFileTransfer
             btnDisconnect.Enabled = false;
         }
 
-        // Обработчик кнопки отправки данных на сервер
         private async void btnSendToServer_Click(object sender, EventArgs e)
         {
             if (!clientConnected)
@@ -402,13 +428,9 @@ namespace SocketFileTransfer
             string fullPath;
 
             if (selected == "..")
-            {
                 fullPath = Directory.GetParent(currentPath)?.FullName ?? currentPath;
-            }
             else
-            {
                 fullPath = Path.Combine(currentPath, selected);
-            }
 
             try
             {
@@ -420,6 +442,13 @@ namespace SocketFileTransfer
 
                 byte[] buffer = new byte[65536];
                 int bytesRead = await clientStream!.ReadAsync(buffer, 0, buffer.Length);
+                if (bytesRead == 0)
+                {
+                    // Сервер закрыл соединение
+                    AppendLogClient("Соединение разорвано сервером.");
+                    DisconnectClient();
+                    return;
+                }
                 string response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                 AppendLogClient($"Клиент получил {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
                 AppendLogClient(response);
@@ -428,10 +457,11 @@ namespace SocketFileTransfer
             {
                 AppendLogClient($"Ошибка отправки: {ex.Message}");
                 MessageBox.Show($"Ошибка: {ex.Message}");
+                // Если ошибка связана с соединением – отключаемся
+                DisconnectClient();
             }
         }
 
-        // Обработчик кнопки показа содержимого файла (передать клиенту)
         private void btnSendToClient_Click(object sender, EventArgs e)
         {
             if (listBoxFiles.SelectedItem == null)
@@ -470,25 +500,28 @@ namespace SocketFileTransfer
                 MessageBox.Show($"Ошибка чтения файла: {ex.Message}");
             }
         }
+        #endregion
 
-        // Обработчик кнопки выхода из приложения
+        #region Application exit
         private void btnExit_Click(object sender, EventArgs e)
         {
             StopServer();
-            if (clientConnected)
-            {
-                clientStream?.Close();
-                client?.Close();
-            }
+            DisconnectClient();
             Application.Exit();
         }
 
-        // Обработчик закрытия формы
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             StopServer();
-            clientStream?.Close();
-            client?.Close();
+            DisconnectClient();
         }
+        #endregion
+
+        #region Server control buttons
+        private void btnServerStop_Click(object sender, EventArgs e)
+        {
+            StopServer();
+        }
+        #endregion
     }
 }
