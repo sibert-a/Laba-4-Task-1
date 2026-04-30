@@ -113,7 +113,10 @@ namespace SocketFileTransfer
                 DirectoryInfo dirInfo = new DirectoryInfo(path);
 
                 if (dirInfo.Parent != null)
+                {
+                    listBoxFiles.Items.Add(".");
                     listBoxFiles.Items.Add("..");
+                }
 
                 foreach (var dir in dirInfo.EnumerateDirectories())
                 {
@@ -128,6 +131,7 @@ namespace SocketFileTransfer
                 }
 
                 currentPath = path;
+                labelCurrentPath.Text = currentPath;
             }
             catch (Exception ex)
             {
@@ -158,6 +162,14 @@ namespace SocketFileTransfer
         {
             if (listBoxFiles.SelectedItem == null) return;
             string selected = listBoxFiles.SelectedItem.ToString();
+
+            if (selected == ".")
+            {
+                string root = Path.GetPathRoot(currentPath); // вернёт, например, "C:\"
+                if (!string.IsNullOrEmpty(root))
+                    LoadFilesAndFolders(root);
+                return;
+            }
 
             if (selected == "..")
             {
