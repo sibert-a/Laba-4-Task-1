@@ -10,8 +10,6 @@ using System.Windows.Forms;
 
 namespace SocketFileTransfer
 {
-    #region CustomButton
-    // Кастомный класс кнопки 
     public class CustomButton : Button
     {
         private Color _normalColor = Color.Black;
@@ -60,41 +58,204 @@ namespace SocketFileTransfer
 
         private void UpdateForeColor()
         {
-            if (Enabled)
-                base.ForeColor = _normalColor;
-            else
-                base.ForeColor = _disabledColor;
+            base.ForeColor = Enabled ? _normalColor : _disabledColor;
         }
     }
-    #endregion
 
     public partial class Form1 : Form
     {
-        #region Fields
-        // Сервер
         private TcpListener? serverListener;
         private Thread? serverThread;
         private bool serverRunning = false;
 
-        // Клиент
         private TcpClient? client;
         private NetworkStream? clientStream;
         private bool clientConnected = false;
 
-        // Для навигации по папкам
         private string currentPath = @"C:\";
-        #endregion
 
-        #region Constructor and initialization
+        private GroupBox groupBoxLeft;
+        private ComboBox comboBoxDrives;
+        private ListBox listBoxFiles;
+        private Label labelIp;
+        private TextBox txtIpAddress;
+        private CustomButton btnServerStop;
+        private CustomButton btnConnect;
+        private CustomButton btnDisconnect;
+        private CustomButton btnExit;
+        private CustomButton btnSendToServer;
+        private CustomButton btnSendToClient;
+        private GroupBox groupBoxClient;
+        private RichTextBox richTextBoxClient;
+        private GroupBox groupBoxServer;
+        private RichTextBox richTextBoxServer;
+
         public Form1()
         {
             InitializeComponent();
             LoadDrives();
             LoadFilesAndFolders(currentPath);
         }
-        #endregion
 
-        #region File system navigation
+        private void InitializeComponent()
+        {
+            groupBoxLeft = new GroupBox();
+            comboBoxDrives = new ComboBox();
+            listBoxFiles = new ListBox();
+            labelIp = new Label();
+            txtIpAddress = new TextBox();
+            btnServerStop = new CustomButton();
+            btnConnect = new CustomButton();
+            btnDisconnect = new CustomButton();
+            btnExit = new CustomButton();
+            btnSendToServer = new CustomButton();
+            btnSendToClient = new CustomButton();
+            groupBoxClient = new GroupBox();
+            richTextBoxClient = new RichTextBox();
+            groupBoxServer = new GroupBox();
+            richTextBoxServer = new RichTextBox();
+
+            // groupBoxLeft
+            groupBoxLeft.BackColor = Color.FromArgb(255, 248, 225);
+            groupBoxLeft.Location = new Point(12, 12);
+            groupBoxLeft.Size = new Size(320, 550);
+            groupBoxLeft.TabIndex = 0;
+            groupBoxLeft.TabStop = false;
+            groupBoxLeft.Text = "";
+
+            // comboBoxDrives
+            comboBoxDrives.DropDownStyle = ComboBoxStyle.DropDown;
+            comboBoxDrives.Location = new Point(6, 12);
+            comboBoxDrives.Size = new Size(308, 23);
+            comboBoxDrives.SelectionChangeCommitted += comboBoxDrives_SelectionChangeCommitted;
+            comboBoxDrives.KeyPress += comboBoxDrives_KeyPress;
+
+            // listBoxFiles
+            listBoxFiles.Location = new Point(6, 40);
+            listBoxFiles.Size = new Size(308, 160);
+            listBoxFiles.DoubleClick += listBoxFiles_DoubleClick;
+
+            // labelIp
+            labelIp.Text = "IP-адрес:";
+            labelIp.ForeColor = Color.Black;
+            labelIp.Location = new Point(6, 210);
+            labelIp.Size = new Size(65, 20);
+            labelIp.TextAlign = ContentAlignment.MiddleLeft;
+
+            // txtIpAddress
+            txtIpAddress.Location = new Point(75, 210);
+            txtIpAddress.Size = new Size(100, 20);
+            txtIpAddress.Text = "127.0.0.1";
+
+            // btnServerStop
+            btnServerStop.Text = "Сервер отключить";
+            btnServerStop.ForeColor = Color.Black;
+            btnServerStop.Location = new Point(180, 208);
+            btnServerStop.Size = new Size(134, 23);
+            btnServerStop.Enabled = false;
+            btnServerStop.Click += btnServerStop_Click;
+
+            // btnConnect
+            btnConnect.Text = "Соединиться";
+            btnConnect.ForeColor = Color.Black;
+            btnConnect.Location = new Point(6, 240);
+            btnConnect.Size = new Size(95, 23);
+            btnConnect.Click += btnConnect_Click;
+
+            // btnDisconnect
+            btnDisconnect.Text = "Отключиться";
+            btnDisconnect.ForeColor = Color.Black;
+            btnDisconnect.Location = new Point(107, 240);
+            btnDisconnect.Size = new Size(95, 23);
+            btnDisconnect.Enabled = false;
+            btnDisconnect.Click += btnDisconnect_Click;
+
+            // btnExit
+            btnExit.Text = "Выход";
+            btnExit.ForeColor = Color.Black;
+            btnExit.Location = new Point(208, 240);
+            btnExit.Size = new Size(106, 23);
+            btnExit.Click += btnExit_Click;
+
+            // btnSendToServer
+            btnSendToServer.Text = "Передать серверу";
+            btnSendToServer.ForeColor = Color.Black;
+            btnSendToServer.Location = new Point(6, 275);
+            btnSendToServer.Size = new Size(150, 30);
+            btnSendToServer.Click += btnSendToServer_Click;
+
+            // btnSendToClient
+            btnSendToClient.Text = "Передать клиенту";
+            btnSendToClient.ForeColor = Color.Black;
+            btnSendToClient.Location = new Point(162, 275);
+            btnSendToClient.Size = new Size(152, 30);
+            btnSendToClient.Click += btnSendToClient_Click;
+
+            groupBoxLeft.Controls.Add(comboBoxDrives);
+            groupBoxLeft.Controls.Add(listBoxFiles);
+            groupBoxLeft.Controls.Add(labelIp);
+            groupBoxLeft.Controls.Add(txtIpAddress);
+            groupBoxLeft.Controls.Add(btnServerStop);
+            groupBoxLeft.Controls.Add(btnConnect);
+            groupBoxLeft.Controls.Add(btnDisconnect);
+            groupBoxLeft.Controls.Add(btnExit);
+            groupBoxLeft.Controls.Add(btnSendToServer);
+            groupBoxLeft.Controls.Add(btnSendToClient);
+
+            // groupBoxClient
+            groupBoxClient.BackColor = Color.FromArgb(255, 248, 225);
+            groupBoxClient.Location = new Point(338, 12);
+            groupBoxClient.Size = new Size(330, 550);
+            groupBoxClient.TabIndex = 1;
+            groupBoxClient.TabStop = false;
+            groupBoxClient.Text = "Клиентская сторона";
+            groupBoxClient.ForeColor = Color.Black;
+
+            richTextBoxClient.BackColor = Color.White;
+            richTextBoxClient.ForeColor = Color.Black;
+            richTextBoxClient.Font = new Font("Consolas", 9F);
+            richTextBoxClient.Location = new Point(6, 19);
+            richTextBoxClient.Size = new Size(318, 525);
+            richTextBoxClient.ReadOnly = true;
+            richTextBoxClient.TabIndex = 0;
+
+            groupBoxClient.Controls.Add(richTextBoxClient);
+
+            // groupBoxServer
+            groupBoxServer.BackColor = Color.FromArgb(255, 248, 225);
+            groupBoxServer.Location = new Point(674, 12);
+            groupBoxServer.Size = new Size(330, 550);
+            groupBoxServer.TabIndex = 2;
+            groupBoxServer.TabStop = false;
+            groupBoxServer.Text = "Серверная сторона";
+            groupBoxServer.ForeColor = Color.Black;
+
+            richTextBoxServer.BackColor = Color.White;
+            richTextBoxServer.ForeColor = Color.Black;
+            richTextBoxServer.Font = new Font("Consolas", 9F);
+            richTextBoxServer.Location = new Point(6, 19);
+            richTextBoxServer.Size = new Size(318, 525);
+            richTextBoxServer.ReadOnly = true;
+            richTextBoxServer.TabIndex = 0;
+
+            groupBoxServer.Controls.Add(richTextBoxServer);
+
+            // Form1
+            AutoScaleDimensions = new SizeF(6F, 13F);
+            AutoScaleMode = AutoScaleMode.Font;
+            BackColor = Color.FromArgb(255, 248, 225);
+            ClientSize = new Size(1016, 574);
+            Controls.Add(groupBoxLeft);
+            Controls.Add(groupBoxClient);
+            Controls.Add(groupBoxServer);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
+            Name = "Form1";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "Программа для обмена данными между компьютерами";
+            FormClosing += Form1_FormClosing;
+        }
+
         private void LoadDrives()
         {
             comboBoxDrives.Items.Clear();
@@ -107,7 +268,6 @@ namespace SocketFileTransfer
         private void LoadFilesAndFolders(string path)
         {
             listBoxFiles.Items.Clear();
-
             try
             {
                 DirectoryInfo dirInfo = new DirectoryInfo(path);
@@ -119,23 +279,16 @@ namespace SocketFileTransfer
                 }
 
                 foreach (var dir in dirInfo.EnumerateDirectories())
-                {
-                    try { listBoxFiles.Items.Add(dir.Name); }
-                    catch { /* нет прав – пропускаем */ }
-                }
+                    try { listBoxFiles.Items.Add(dir.Name); } catch { }
 
                 foreach (var file in dirInfo.EnumerateFiles())
-                {
-                    try { listBoxFiles.Items.Add(file.Name); }
-                    catch { /* нет прав – пропускаем */ }
-                }
+                    try { listBoxFiles.Items.Add(file.Name); } catch { }
 
                 currentPath = path;
-                labelCurrentPath.Text = currentPath;
+                UpdateComboBoxPath();
             }
             catch (Exception ex)
             {
-                // Сама корневая папка недоступна
                 listBoxFiles.Items.Clear();
                 string parent = Path.GetDirectoryName(path);
                 if (!string.IsNullOrEmpty(parent))
@@ -143,19 +296,50 @@ namespace SocketFileTransfer
 
                 MessageBox.Show($"Ошибка доступа: {ex.Message}", "Ошибка",
                                 MessageBoxButtons.OK, MessageBoxIcon.Error);
-                // currentPath не меняем, чтобы можно было вернуться
             }
         }
-        #endregion
 
-        #region Event handlers – form controls
-        private void comboBoxDrives_SelectedIndexChanged(object sender, EventArgs e)
+        private void UpdateComboBoxPath()
+        {
+            comboBoxDrives.Text = GetElidedPath(currentPath);
+        }
+
+        private string GetElidedPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+
+            int availableWidth = comboBoxDrives.Width - SystemInformation.VerticalScrollBarWidth - 4;
+            using (var g = comboBoxDrives.CreateGraphics())
+            {
+                SizeF fullSize = TextRenderer.MeasureText(g, path, comboBoxDrives.Font);
+                if (fullSize.Width <= availableWidth)
+                    return path;
+
+                string ellipsis = "...";
+                int maxSuffixLen = path.Length;
+                for (int i = 1; i <= path.Length; i++)
+                {
+                    string candidate = ellipsis + path.Substring(path.Length - i);
+                    if (TextRenderer.MeasureText(g, candidate, comboBoxDrives.Font).Width > availableWidth)
+                        break;
+                    maxSuffixLen = i;
+                }
+                return ellipsis + path.Substring(path.Length - maxSuffixLen);
+            }
+        }
+
+        private void comboBoxDrives_SelectionChangeCommitted(object sender, EventArgs e)
         {
             if (comboBoxDrives.SelectedItem != null)
             {
                 currentPath = comboBoxDrives.SelectedItem.ToString();
                 LoadFilesAndFolders(currentPath);
             }
+        }
+
+        private void comboBoxDrives_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            e.Handled = true;
         }
 
         private void listBoxFiles_DoubleClick(object sender, EventArgs e)
@@ -165,7 +349,7 @@ namespace SocketFileTransfer
 
             if (selected == ".")
             {
-                string root = Path.GetPathRoot(currentPath); // вернёт, например, "C:\"
+                string root = Path.GetPathRoot(currentPath);
                 if (!string.IsNullOrEmpty(root))
                     LoadFilesAndFolders(root);
                 return;
@@ -180,8 +364,6 @@ namespace SocketFileTransfer
             }
 
             string newPath = Path.Combine(currentPath, selected);
-
-            // Если это папка – проверяем доступ перед загрузкой
             if (Directory.Exists(newPath))
             {
                 try
@@ -196,9 +378,7 @@ namespace SocketFileTransfer
                 }
             }
         }
-        #endregion
 
-        #region Logging helpers
         private void AppendLogClient(string msg)
         {
             if (richTextBoxClient.InvokeRequired)
@@ -220,9 +400,7 @@ namespace SocketFileTransfer
             richTextBoxServer.AppendText(msg + Environment.NewLine);
             richTextBoxServer.ScrollToCaret();
         }
-        #endregion
 
-        #region Server logic
         private void StartServer()
         {
             if (serverRunning) return;
@@ -255,8 +433,6 @@ namespace SocketFileTransfer
                     {
                         TcpClient clientSocket = serverListener.AcceptTcpClient();
                         AppendLogServer($"Клиент соединился {DateTime.Now:dd.MM.yyyy HH:mm:ss} с адреса {((IPEndPoint)clientSocket.Client.RemoteEndPoint).Address}");
-
-                        // Обрабатываем подключение в отдельной задаче, чтобы не блокировать приём новых клиентов
                         ThreadPool.QueueUserWorkItem(_ => HandleClient(clientSocket));
                     }
                     Thread.Sleep(100);
@@ -276,7 +452,6 @@ namespace SocketFileTransfer
                 using (clientSocket)
                 using (NetworkStream stream = clientSocket.GetStream())
                 {
-                    // 1. Отправляем список дисков (только один раз в начале сессии)
                     string drives = string.Join(",", DriveInfo.GetDrives().Select(d => d.Name.TrimEnd('\\')));
                     byte[] drivesData = Encoding.UTF8.GetBytes(drives);
                     stream.Write(drivesData, 0, drivesData.Length);
@@ -285,12 +460,10 @@ namespace SocketFileTransfer
                     byte[] buffer = new byte[4096];
                     int bytesRead;
 
-                    // 2. Принимаем запросы, пока клиент не отключится
                     while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
                     {
                         string path = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
                         AppendLogServer($"Сервер получил {DateTime.Now:dd.MM.yyyy HH:mm:ss}: {path}");
-
                         string response = ProcessServerRequest(path);
                         byte[] responseData = Encoding.UTF8.GetBytes(response);
                         stream.Write(responseData, 0, responseData.Length);
@@ -300,7 +473,6 @@ namespace SocketFileTransfer
             }
             catch (Exception ex)
             {
-                // Игнорируем тихое отключение клиента, логируем только реальные ошибки
                 if (ex is IOException || ex is ObjectDisposedException) return;
                 AppendLogServer($"Ошибка при обработке клиента: {ex.Message}");
             }
@@ -340,9 +512,7 @@ namespace SocketFileTransfer
                 return $"Ошибка: {ex.Message}";
             }
         }
-        #endregion
 
-        #region Client logic
         private async void btnConnect_Click(object sender, EventArgs e)
         {
             if (clientConnected)
@@ -351,11 +521,10 @@ namespace SocketFileTransfer
                 return;
             }
 
-            // Автозапуск своего сервера при необходимости
             if (!serverRunning)
             {
                 StartServer();
-                Thread.Sleep(500); // Даём серверу время запуститься
+                Thread.Sleep(500);
             }
 
             string serverIp = txtIpAddress.Text.Trim();
@@ -375,7 +544,6 @@ namespace SocketFileTransfer
                 btnConnect.Enabled = false;
                 btnDisconnect.Enabled = true;
 
-                // Получаем список дисков от сервера
                 byte[] buffer = new byte[4096];
                 int bytesRead = await clientStream.ReadAsync(buffer, 0, buffer.Length);
                 string drivesList = Encoding.UTF8.GetString(buffer, 0, bytesRead);
@@ -389,8 +557,12 @@ namespace SocketFileTransfer
                         comboBoxDrives.Items.Clear();
                         foreach (var d in drivesList.Split(','))
                             comboBoxDrives.Items.Add(d + "\\");
+
                         if (comboBoxDrives.Items.Count > 0)
-                            comboBoxDrives.SelectedIndex = 0;
+                        {
+                            currentPath = comboBoxDrives.Items[0].ToString();
+                            LoadFilesAndFolders(currentPath);
+                        }
                     }));
                 }
             }
@@ -456,7 +628,6 @@ namespace SocketFileTransfer
                 int bytesRead = await clientStream!.ReadAsync(buffer, 0, buffer.Length);
                 if (bytesRead == 0)
                 {
-                    // Сервер закрыл соединение
                     AppendLogClient("Соединение разорвано сервером.");
                     DisconnectClient();
                     return;
@@ -469,7 +640,6 @@ namespace SocketFileTransfer
             {
                 AppendLogClient($"Ошибка отправки: {ex.Message}");
                 MessageBox.Show($"Ошибка: {ex.Message}");
-                // Если ошибка связана с соединением – отключаемся
                 DisconnectClient();
             }
         }
@@ -512,9 +682,7 @@ namespace SocketFileTransfer
                 MessageBox.Show($"Ошибка чтения файла: {ex.Message}");
             }
         }
-        #endregion
 
-        #region Application exit
         private void btnExit_Click(object sender, EventArgs e)
         {
             StopServer();
@@ -527,13 +695,10 @@ namespace SocketFileTransfer
             StopServer();
             DisconnectClient();
         }
-        #endregion
 
-        #region Server control buttons
         private void btnServerStop_Click(object sender, EventArgs e)
         {
             StopServer();
         }
-        #endregion
     }
 }
